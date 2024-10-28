@@ -2,10 +2,10 @@
 
 # Global Variables
 MAIN_URL="https://raw.githubusercontent.com/ShuttleTydirium/selfhost_setup_utils/main"
-NODE_URL="$MAIN_URL:/packages/node-v20.18.4-linux-arm64-musl.tar.gz" 
+NODE_URL="$MAIN_URL/packages/node-v20.18.4-linux-arm64-musl.tar.gz" 
 YARN_VERSION="1.22.19"
-MYSPEED_URL="$MAIN_URL:/packages/myspeed-v109-linux-arm64.tar.gz"
-MYSPEED_INIT_URL="$MAIN_URL:/scripts/myspeed.rc"
+MYSPEED_URL="$MAIN_URL/packages/myspeed-v109-linux-arm64.tar.gz"
+MYSPEED_INIT_URL="$MAIN_URL/scripts/myspeed.rc"
 
 # Exit immediately if a command exits with a non-zero status
 set -e
