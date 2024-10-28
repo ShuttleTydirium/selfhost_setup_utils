@@ -1,0 +1,60 @@
+#!/sbin/openrc-run
+
+# OpenRC init script for Authelia
+
+name="Authelia"
+description="Authelia authentication and authorization server"
+command="/usr/bin/authelia"
+command_user="authelia:authelia"
+command_background="yes"
+pidfile="/run/authelia.pid"
+config_file="/etc/authelia/config.yml"
+log_file="/var/log/authelia.log"
+
+depend() {
+    need net
+    use dns logger
+}
+
+start_pre() {
+    if [ ! -f "$config_file" ]; then
+        eerror "Configuration file not found: $config_file"
+        return 1
+    fi
+    if [ ! -d "/var/lib/authelia" ]; then
+        eerror "Home directory for user authelia not found: /var/lib/authelia"
+        return 1
+    fi
+    if [ ! -f "$log_file" ]; then
+        # Create the log file
+        touch "$log_file"
+        chown "$command_user" "$log_file"
+        chmod 640 "$log_file"
+        echo "Created log file: $log_file"
+    fi
+}
+
+start() {
+    ebegin "Starting Authelia"
+    start-stop-daemon --start --exec "$command" \
+        --user "$command_user" \
+        --pidfile "$pidfile" \
+        --background --make-pidfile \
+        --stdout "$log_file" --stderr "$log_file" \
+        -- --config "$config_file"
+    eend $?
+}
+
+stop() {
+    ebegin "Stopping Authelia"
+    start-stop-daemon --stop --pidfile "$pidfile"
+    eend $?
+}
+
+restart() {
+    ebegin "Restarting Authelia"
+    stop
+    sleep 1
+    start
+    eend $?
+}

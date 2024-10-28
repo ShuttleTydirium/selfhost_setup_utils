@@ -1,0 +1,185 @@
+# yamllint disable rule:comments-indentation
+---
+###############################################################################
+##                           Authelia Configuration                          ##
+###############################################################################
+
+## Certificates directory specifies where Authelia will load trusted certificates (public portion) from in addition to
+## the system certificates store.
+## They should be in base64 format, and have one of the following extensions: *.cer, *.crt, *.pem.
+# certificates_directory: '/config/certificates/'
+
+## The theme to display: light, dark, grey, auto.
+theme: 'auto'
+
+##
+## Server Configuration
+##
+server:
+  ## The address for the Main server to listen on in the address common syntax.
+  ## Formats:
+  ##  - [<scheme>://]<hostname>[:<port>][/<path>]
+  ##  - [<scheme>://][hostname]:<port>[/<path>]
+  ## Square brackets indicate optional portions of the format. Scheme must be 'tcp', 'tcp4', 'tcp6', or 'unix'.
+  ## The default scheme is 'unix' if the address is an absolute path otherwise it's 'tcp'. The default port is '9091'.
+  ## If the path is specified this configures the router to handle both the `/` path and the configured path.
+  address: 'tcp://:9091/'
+
+##
+## Log Configuration
+##
+log:
+  ## Level of verbosity for logs: info, debug, trace.
+  level: 'debug'
+
+
+##
+## Identity Validation Configuration
+##
+## This configuration tunes the identity validation flows.
+identity_validation:
+  ## Reset Password flow. Adjusts how the reset password flow operates.
+  reset_password:
+    jwt_secret: 'a_very_important_secret'
+
+##
+## Authentication Backend Provider Configuration
+##
+## Used for verifying user passwords and retrieve information such as email address and groups users belong to.
+##
+## The available providers are: `file`, `ldap`. You must use only one of these providers.
+authentication_backend:
+  ##
+  ## File (Authentication Provider)
+  ##
+  ## With this backend, the users database is stored in a file which is updated when users reset their passwords.
+  ## Therefore, this backend is meant to be used in a dev environment and not in production since it prevents Authelia
+  ## to be scaled to more than one instance. The options under 'password' have sane defaults, and as it has security
+  ## implications it is highly recommended you leave the default values. Before considering changing these settings
+  ## please read the docs page below:
+  ## https://www.authelia.com/r/passwords#tuning
+  ##
+  ## Important: Kubernetes (or HA) users must read https://www.authelia.com/t/statelessness
+  ##
+  file:
+    path: '/etc/authelia/users_database.yml'
+
+##
+## Access Control Configuration
+##
+access_control:
+  ## Default policy can either be 'bypass', 'one_factor', 'two_factor' or 'deny'. It is the policy applied to any
+  ## resource if there is no policy to be applied to the user.
+  default_policy: 'deny'
+  
+  rules:
+  ## Rules applied to everyone
+  - domain: 'auth.lan'
+    policy: 'one_factor'
+
+##
+## Session Provider Configuration
+##
+## The session cookies identify the user once logged in.
+## The available providers are: `memory`, `redis`. Memory is the provider unless redis is defined.
+session:
+  ## Cookies configures the list of allowed cookie domains for sessions to be created on.
+  ## Undefined values will default to the values below.
+  cookies:
+    -
+      ## The name of the session cookie.
+      name: 'authelia_session'
+
+      ## The domain to protect.
+      ## Note: the Authelia portal must also be in that domain.
+      domain: 'auth.lan'
+
+      ## Required. The fully qualified URI of the portal to redirect users to on proxies that support redirections.
+      ## Rules:
+      ##   - MUST use the secure scheme 'https://'
+      ##   - The above 'domain' option MUST either:
+      ##      - Match the host portion of this URI.
+      ##      - Match the suffix of the host portion when prefixed with '.'.
+      authelia_url: 'https://auth.lan'
+
+      ## Optional. The fully qualified URI used as the redirection location if the portal is accessed directly. Not
+      ## configuring this option disables the automatic redirection behaviour.
+      ##
+      ## Note: this parameter is optional. If not provided, user won't be redirected upon successful authentication
+      ## unless they were redirected to Authelia by the proxy.
+      ##
+      ## Rules:
+      ##   - MUST use the secure scheme 'https://'
+      ##   - MUST not match the 'authelia_url' option.
+      ##   - The above 'domain' option MUST either:
+      ##      - Match the host portion of this URI.
+      ##      - Match the suffix of the host portion when prefixed with '.'.
+      # default_redirection_url: 'https://www.example.com'
+
+      ## Sets the Cookie SameSite value. Possible options are none, lax, or strict.
+      ## Please read https://www.authelia.com/c/session#same_site
+      # same_site: 'lax'
+
+      ## The value for inactivity, expiration, and remember_me are in seconds or the duration common syntax.
+      ## All three of these values affect the cookie/session validity period. Longer periods are considered less secure
+      ## because a stolen cookie will last longer giving attackers more time to spy or attack.
+
+      ## The inactivity time before the session is reset. If expiration is set to 1h, and this is set to 5m, if the user
+      ## does not select the remember me option their session will get destroyed after 1h, or after 5m since the last
+      ## time Authelia detected user activity.
+      inactivity: '5 minutes'
+
+      ## The time before the session cookie expires and the session is destroyed if remember me IS NOT selected by the
+      ## user.
+      expiration: '1 hour'
+
+      ## The time before the cookie expires and the session is destroyed if remember me IS selected by the user. Setting
+      ## this value to -1 disables remember me for this session cookie domain. If allowed and the user uses the remember
+      ## me checkbox this overrides the expiration option and disables the inactivity option.
+      remember_me: '1 month'
+
+
+  ## Cookie Session Domain default 'name' value.
+  name: 'authelia_session'
+
+  ## Cookie Session Domain default 'inactivity' value.
+  inactivity: '5m'
+
+  ## Cookie Session Domain default 'expiration' value.
+  expiration: '1h'
+
+  ## Cookie Session Domain default 'remember_me' value.
+  remember_me: '1M'
+
+##
+## Storage Provider Configuration
+##
+## The available providers are: `local`, `mysql`, `postgres`. You must use one and only one of these providers.
+storage:
+  ## The encryption key that is used to encrypt sensitive information in the database. Must be a string with a minimum
+  ## length of 20. Please see the docs if you configure this with an undesirable key and need to change it, you MUST use
+  ## the CLI to change this in the database if you want to change it from a previously configured value.
+  encryption_key: 'you_must_generate_a_random_string_of_more_than_twenty_chars_and_configure_this'
+
+  ##
+  ## Local (Storage Provider)
+  ##
+  ## This stores the data in a SQLite3 Database.
+  ## This is only recommended for lightweight non-stateful installations.
+  local:
+    ## Path to the SQLite3 Database.
+    path: '/var/lib/authelia/db.sqlite3'
+
+##
+## Notification Provider
+##
+## Notifications are sent to users when they require a password reset, a WebAuthn registration or a TOTP registration.
+## The available providers are: filesystem, smtp. You must use only one of these providers.
+notifier:
+  ##
+  ## File System (Notification Provider)
+  ##
+  ## Important: Kubernetes (or HA) users must read https://www.authelia.com/t/statelessness
+  ##
+  filesystem:
+    filename: '/var/lib/authelia/notification.txt'

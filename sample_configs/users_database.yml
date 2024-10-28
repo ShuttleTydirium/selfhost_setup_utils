@@ -1,0 +1,8 @@
+# /etc/authelia/users_database.yml - User database for local authentication
+
+users:
+  testuser:
+    password: "$2y$12$IfkH6l3E/2gCbT4yD90f4OEEWQbMnPIzYydNkQnVPwxw2.6uwIEci"  # "password"
+    displayname: Test User
+    email: testuser@example.com
+
