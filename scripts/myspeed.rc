@@ -1,17 +1,18 @@
 #!/sbin/openrc-run
 
 # OpenRC metadata
-description="myspeed service"
-command="/usr/local/bin/node"
-command_args="server"
-command_user="myspeed:myspeed"
-directory="/opt/myspeed"
 name="myspeed"
+description="myspeed service"
+command="/usr/bin/node"
+directory="/opt/myspeed"
+command_args=$directory/server
+command_user="myspeed:myspeed"
+command_background=true
 
 # Logging (optional)
 pidfile="/run/myspeed.pid"
-output_log="/var/log/myspeed.log"
-error_log="/var/log/myspeed.err"
+#output_log="/var/log/myspeed.log"
+#error_log="/var/log/myspeed.err"
 
 depend() {
     need net
@@ -35,24 +36,10 @@ start_pre() {
     done
 
     # Set ownership of all files/folders to myspeed:myspeed
-    einfo "Setting ownership of $directory to myspeed:myspeed"
-    chown -R myspeed:myspeed "$directory" || return 1
+    einfo "Setting ownership of $directory to $command_user"
+    chown -R "$command_user" "$directory" || return 1
+
+	export NODE_END=production
 
     eend 0
-}
-
-stop() {
-    ebegin "Stopping myspeed"
-    start-stop-daemon --stop --quiet --pidfile "$pidfile"
-    eend $?
-}
-
-start() {
-    ebegin "Starting myspeed"
-    start-stop-daemon --start --quiet --pidfile "$pidfile" \
-                      --make-pidfile --chdir "$directory" \
-                      --user "$command_user" \
-                      --env NODE_ENV=production \
-                      --exec "$command" -- $command_args >> "$output_log" 2>> "$error_log" &
-    eend $?
 }
