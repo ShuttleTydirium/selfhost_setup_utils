@@ -39,7 +39,7 @@ start_pre() {
     einfo "Setting ownership of $directory to $command_user"
     chown -R "$command_user" "$directory" || return 1
 
-	export NODE_END=production
+    export NODE_ENV=production
 
     eend 0
 }

@@ -1,100 +1,66 @@
 #!/bin/ash
 
-# Global Variables
-MAIN_URL="https://raw.githubusercontent.com/ShuttleTydirium/selfhost_setup_utils/main"
-NODE_URL="$MAIN_URL/packages/node-v20.18.4-linux-arm64-musl.tar.gz" 
-YARN_VERSION="1.22.19"
-MYSPEED_URL="$MAIN_URL/packages/myspeed-v109-linux-arm64.tar.gz"
-MYSPEED_INIT_URL="$MAIN_URL/scripts/myspeed.rc"
+# Define constants
+GROUP="myspeed"
+USER="myspeed"
+TEMP_DEPS="curl unzip"
+ALPINE_VERSION_REQUIRED="3.18"
 
-# Exit immediately if a command exits with a non-zero status
-set -e
-
-log_info() { echo "[INFO] $1"; }
-log_error() { echo "[ERROR] $1"; exit 1; }
-cleanup() { rm -rf /tmp/* /var/cache/apk/* ~/.gnupg/; }
-
-# Step 1: Install Node.js
-install_node() {
-    log_info "Installing libstdc++ dependency"
-    apk add --no-cache libstdc++ curl
-
-    log_info "Downloading Node.js precompiled package"
-    curl -fsSL "$NODE_URL" -o /tmp/node.tar.gz
-
-    log_info "Extracting Node.js to /usr/local/"
-    tar -xzf /tmp/node.tar.gz -C /usr/local/
-    rm /tmp/node.tar.gz
-
-    log_info "Node.js installation complete"
+# Function to report status and progress
+report_status() {
+    echo "[INFO] $1"
 }
 
-# Step 2: Install Yarn
-install_yarn() {
-    log_info "Installing build dependencies for Yarn"
-    apk add --no-cache --virtual .build-deps-yarn curl gnupg tar
-
-    log_info "Setting up GPG keys for Yarn verification"
-    export GNUPGHOME="$(mktemp -d)"
-    gpg --batch --keyserver hkps://keys.openpgp.org --recv-keys 6A010C5166006599AA17F08146C2130DFD2497F5 || \
-        gpg --batch --keyserver keyserver.ubuntu.com --recv-keys 6A010C5166006599AA17F08146C2130DFD2497F5
-
-    log_info "Downloading Yarn version $YARN_VERSION"
-    curl -fsSLO "https://yarnpkg.com/downloads/$YARN_VERSION/yarn-v$YARN_VERSION.tar.gz"
-    curl -fsSLO "https://yarnpkg.com/downloads/$YARN_VERSION/yarn-v$YARN_VERSION.tar.gz.asc"
-    gpg --batch --verify yarn-v$YARN_VERSION.tar.gz.asc yarn-v$YARN_VERSION.tar.gz
-
-    log_info "Installing Yarn"
-    mkdir -p /opt
-    tar -xzf yarn-v$YARN_VERSION.tar.gz -C /opt/
-    ln -s /opt/yarn-v$YARN_VERSION/bin/yarn /usr/local/bin/yarn
-    ln -s /opt/yarn-v$YARN_VERSION/bin/yarnpkg /usr/local/bin/yarnpkg
-
-    log_info "Cleaning up Yarn installation files"
-    rm yarn-v$YARN_VERSION.tar.gz*
-    gpgconf --kill all
-    rm -rf "$GNUPGHOME"
-    apk del .build-deps-yarn
-
-    log_info "Yarn installation complete"
+# Function to handle errors
+handle_error() {
+    echo "[ERROR] $1"
+    exit 1
 }
 
-# Step 3: Install myspeed
-install_myspeed() {
-    log_info "Installing tzdata dependency"
-    apk add --no-cache tzdata
+# Check Alpine version
+report_status "Checking Alpine Linux version..."
+ALPINE_VERSION=$(cat /etc/alpine-release)
+if [ "${ALPINE_VERSION%.*}" != "$ALPINE_VERSION_REQUIRED" ]; then
+    handle_error "Unsupported Alpine version: $ALPINE_VERSION. Please use Alpine $ALPINE_VERSION_REQUIRED.x with Node.js v18."
+fi
+report_status "Alpine version is compatible. Proceeding..."
 
-    log_info "Downloading myspeed package"
-    curl -fsSL "$MYSPEED_URL" -o /tmp/myspeed.tar.gz
+# Install dependencies
+report_status "Installing temporary dependencies: $TEMP_DEPS..."
+apk add --no-cache $TEMP_DEPS || handle_error "Failed to install temporary dependencies."
 
-    log_info "Extracting myspeed to /opt/myspeed/"
-    mkdir -p /opt/myspeed
-    tar -xzf /tmp/myspeed.tar.gz -C /opt/myspeed/
-    rm /tmp/myspeed.tar.gz
+report_status "Installing Node.js and npm..."
+apk add --no-cache nodejs npm || handle_error "Failed to install Node.js and npm."
 
-    log_info "Creating system user and group for myspeed"
-    addgroup -S myspeed || log_error "Failed to create group"
-    adduser -S -G myspeed -s /sbin/nologin myspeed || log_error "Failed to create user"
+# Download and install myspeed package
+report_status "Setting up myspeed installation..."
+mkdir -p /opt/myspeed && cd /opt/myspeed || handle_error "Failed to create directory."
 
-    log_info "Downloading and installing myspeed init script"
-    curl -fsSL "$MYSPEED_INIT_URL" -o /etc/init.d/myspeed
-    chmod +x /etc/init.d/myspeed
+DOWNLOAD_URL=$(curl -s https://api.github.com/repos/gnmyt/myspeed/releases/latest | grep browser_download_url | cut -d '"' -f 4)
+wget "$DOWNLOAD_URL" || handle_error "Failed to download myspeed package."
 
-    log_info "Registering myspeed service with OpenRC"
-    rc-update add myspeed default
+unzip MySpeed-*.zip || handle_error "Failed to unzip myspeed package."
+rm MySpeed-*.zip || handle_error "Failed to remove zip file."
 
-    log_info "myspeed installation complete"
-}
+npm install || handle_error "Failed to install myspeed npm dependencies."
 
-# Main Installation Flow
-main() {
-    log_info "Starting myspeed installation process"
-    install_node
-    install_yarn
-    install_myspeed
-    cleanup
-    log_info "myspeed installed successfully!"
-}
+# Cleanup
+report_status "Cleaning up temporary dependencies and files..."
+apk del $TEMP_DEPS || handle_error "Failed to remove temporary dependencies."
+rm -rf /tmp/* || handle_error "Failed to clean /tmp/."
 
-# Execute the main function
-main
+# Create system user and group
+report_status "Creating system user and group: $GROUP, $USER..."
+addgroup -S "$GROUP" || handle_error "Failed to create group."
+adduser -S -G "$GROUP" -D -h /nonexistent -s /sbin/nologin -g "$USER" "$USER" || handle_error "Failed to create user."
+
+# Install and register init script
+report_status "Installing and registering myspeed init script..."
+INIT_SCRIPT_URL="https://raw.githubusercontent.com/ShuttleTydirium/selfhost_setup_utils/main/scripts/myspeed.rc"
+wget -O /etc/init.d/myspeed "$INIT_SCRIPT_URL" || handle_error "Failed to download init script."
+chmod +x /etc/init.d/myspeed || handle_error "Failed to make init script executable."
+
+rc-update add myspeed default || handle_error "Failed to register myspeed with OpenRC."
+
+# Final status report
+report_status "MySpeed installation completed successfully!"
